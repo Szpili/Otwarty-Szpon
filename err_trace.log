@@ -1,0 +1,30 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/user/Otwarty-Szpon[39m
+
+[90mstderr[2m | src/agents/pi-embedded-runner/run.overflow-failover.test.ts[2m > [22m[2moverflow failover in run loop[2m > [22m[2mthrows FailoverError when overflow happens again after compaction with fallbacks configured
+[22m[39mTypeError: Cannot read properties of undefined (reading 'compacted')
+    at [90m/Users/user/Otwarty-Szpon/[39msrc/agents/pi-embedded-runner/run.ts:669:33
+
+ [31m❯[39m src/agents/pi-embedded-runner/run.overflow-failover.test.ts [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 30[2mms[22m[39m
+[31m     [31m×[31m throws FailoverError when overflow happens again after compaction with fallbacks configured[39m[32m 27[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/agents/pi-embedded-runner/run.overflow-failover.test.ts[2m > [22moverflow failover in run loop[2m > [22mthrows FailoverError when overflow happens again after compaction with fallbacks configured
+[31m[1mAssertionError[22m: expected TypeError: Cannot read properties of unde… to be an instance of FailoverError[39m
+[36m [2m❯[22m src/agents/pi-embedded-runner/run.overflow-failover.test.ts:[2m225:19[22m[39m
+    [90m223| [39m    } [35mcatch[39m (err[33m:[39m any) {
+    [90m224| [39m      console[33m.[39m[34merror[39m(err)[33m;[39m
+    [90m225| [39m      [34mexpect[39m(err)[33m.[39m[34mtoBeInstanceOf[39m([33mFailoverError[39m)[33m;[39m
+    [90m   | [39m                  [31m^[39m
+    [90m226| [39m      [34mexpect[39m(err[33m.[39mreason)[33m.[39m[34mtoBe[39m([32m"context_overflow"[39m)[33m;[39m
+    [90m227| [39m    }
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 03:34:16
+[2m   Duration [22m 4.07s[2m (transform 1.07s, setup 370ms, import 3.42s, tests 30ms, environment 0ms)[22m
+
