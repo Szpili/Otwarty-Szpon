@@ -17,6 +17,7 @@ import {
   formatReasoningMessage,
   promoteThinkingTagsToBlocks,
 } from "./pi-embedded-utils.js";
+import { checkStreamingChunk, checkFinalResponse } from "./quality-guard.js";
 
 const stripTrailingDirective = (text: string): string => {
   const openIndex = text.lastIndexOf("[[");
@@ -163,6 +164,9 @@ export function handleMessageUpdate(
     } else {
       ctx.state.blockBuffer += chunk;
     }
+
+    // Check streaming chunk quality
+    checkStreamingChunk(ctx.qualityGuardState, chunk);
   }
 
   if (ctx.state.streamReasoning) {
@@ -421,6 +425,22 @@ export function handleMessageEnd(
         });
       }
     }
+  }
+
+  // Clear stall check interval before final checks so thrown errors can't leak the timer.
+  clearInterval(ctx.stallCheckInterval);
+
+  // For non-streaming providers, only message_end may carry assistant text.
+  // Seed the guard once so final validation reflects actual output.
+  if (ctx.qualityGuardState.totalChars === 0 && text.trim()) {
+    checkStreamingChunk(ctx.qualityGuardState, text);
+  }
+
+  // Only validate when we observed some assistant output.
+  // Embedded streams can legitimately contain short snippets, so keep
+  // validation focused on empty responses in this path.
+  if (ctx.qualityGuardState.totalChars > 0) {
+    checkFinalResponse(ctx.qualityGuardState, { minResponseChars: 1 });
   }
 
   ctx.state.deltaBuffer = "";

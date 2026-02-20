@@ -18,6 +18,7 @@ import type {
 } from "./pi-embedded-subscribe.handlers.types.js";
 import type { SubscribeEmbeddedPiSessionParams } from "./pi-embedded-subscribe.types.js";
 import { formatReasoningMessage, stripDowngradedToolCallText } from "./pi-embedded-utils.js";
+import { createQualityGuardState, checkForStall, type QualityGuardState } from "./quality-guard.js";
 import { hasNonzeroUsage, normalizeUsage, type UsageLike } from "./usage.js";
 
 const THINKING_TAG_SCAN_RE = /<\s*(\/?)\s*(?:think(?:ing)?|thought|antthinking)\s*>/gi;
@@ -34,6 +35,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
   const reasoningMode = params.reasoningMode ?? "off";
   const toolResultFormat = params.toolResultFormat ?? "markdown";
   const useMarkdown = toolResultFormat === "markdown";
+  const qualityGuardState: QualityGuardState = createQualityGuardState();
+  const stallCheckInterval = setInterval(() => {
+    checkForStall(qualityGuardState);
+  }, 10000); // Check for stall every 10 seconds
+
   const state: EmbeddedPiSubscribeState = {
     assistantTexts: [],
     toolMetas: [],
@@ -370,7 +376,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     const codeSpans = buildCodeSpanIndex(text, inlineStateStart);
 
     // 1. Handle <think> blocks (stateful, strip content inside)
-    let processed = "";
+    const parts: string[] = [];
     THINKING_TAG_SCAN_RE.lastIndex = 0;
     let lastIndex = 0;
     let inThinking = state.thinking;
@@ -380,15 +386,16 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
         continue;
       }
       if (!inThinking) {
-        processed += text.slice(lastIndex, idx);
+        parts.push(text.slice(lastIndex, idx));
       }
       const isClose = match[1] === "/";
       inThinking = !isClose;
       lastIndex = idx + match[0].length;
     }
     if (!inThinking) {
-      processed += text.slice(lastIndex);
+      parts.push(text.slice(lastIndex));
     }
+    const processed = parts.join("");
     state.thinking = inThinking;
 
     // 2. Handle <final> blocks (stateful, strip content OUTSIDE)
@@ -434,11 +441,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     }
     state.final = inFinal;
 
-    // Strict Mode: If enforcing final tags, we MUST NOT return content unless
-    // we have seen a <final> tag. Otherwise, we leak "thinking out loud" text
-    // (e.g. "**Locating Manulife**...") that the model emitted without <think> tags.
+    // Strict Mode fallback: If enforcing final tags but no <final> tag was seen,
+    // fall back to returning the processed text. This prevents silent reply drops
+    // when the model (e.g. Gemini) doesn't emit the expected <final> tag.
     if (!everInFinal) {
-      return "";
+      return processed;
     }
 
     // Hardened Cleanup: Remove any remaining <final> tags that might have been
@@ -453,7 +460,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
     pattern: RegExp,
     isInside: (index: number) => boolean,
   ) => {
-    let output = "";
+    const parts: string[] = [];
     let lastIndex = 0;
     pattern.lastIndex = 0;
     for (const match of text.matchAll(pattern)) {
@@ -461,11 +468,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
       if (isInside(idx)) {
         continue;
       }
-      output += text.slice(lastIndex, idx);
+      parts.push(text.slice(lastIndex, idx));
       lastIndex = idx + match[0].length;
     }
-    output += text.slice(lastIndex);
-    return output;
+    parts.push(text.slice(lastIndex));
+    return parts.join("");
   };
 
   const emitBlockChunk = (text: string) => {
@@ -604,6 +611,8 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
   const ctx: EmbeddedPiSubscribeContext = {
     params,
     state,
+    qualityGuardState,
+    stallCheckInterval,
     log,
     blockChunking,
     blockChunker,

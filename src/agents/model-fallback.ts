@@ -22,6 +22,8 @@ import {
 } from "./model-selection.js";
 import type { FailoverReason } from "./pi-embedded-helpers.js";
 import { isLikelyContextOverflowError } from "./pi-embedded-helpers.js";
+import { applySmartRouting } from "./smart-routing.js";
+import { applyBudgetSteering } from "./token-budget.js";
 
 type ModelCandidate = {
   provider: string;
@@ -289,14 +291,27 @@ export async function runWithModelFallback<T>(params: {
   agentDir?: string;
   /** Optional explicit fallbacks list; when provided (even empty), replaces agents.defaults.model.fallbacks. */
   fallbacksOverride?: string[];
+  /** When provided, enables smart routing: reorders candidates based on task type. */
+  prompt?: string;
   run: (provider: string, model: string) => Promise<T>;
   onError?: ModelFallbackErrorHandler;
 }): Promise<ModelFallbackRunResult<T>> {
-  const candidates = resolveFallbackCandidates({
+  const rawCandidates = resolveFallbackCandidates({
     cfg: params.cfg,
     provider: params.provider,
     model: params.model,
     fallbacksOverride: params.fallbacksOverride,
+  });
+  const routedCandidates = applySmartRouting({
+    candidates: rawCandidates,
+    prompt: params.prompt,
+    cfg: params.cfg,
+  });
+  // Apply budget steering: deprioritize providers near quota limits.
+  // This is a no-op if usage data is unavailable.
+  const candidates = await applyBudgetSteering({
+    candidates: routedCandidates,
+    cfg: params.cfg,
   });
   const authStore = params.cfg
     ? ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false })

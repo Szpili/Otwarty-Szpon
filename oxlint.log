@@ -1,0 +1,133 @@
+
+  x eslint(no-misleading-character-class): Unexpected combining class in character class.
+    ,-[src/auto-reply/reply/reply-audit.ts:10:22]
+  9 |   /^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]{1,12}$/u,
+ 10 |   /^[👍👎👌🙏❤️💜🔥✅💯🎉🤝]{1,5}$/u,
+    :              ^^
+ 11 |   /^(ha(ha)+|lol|lmao|rofl|xd|😂+|🤣+)[\s!.]*$/i,
+    `----
+
+  x eslint(no-unused-vars): Type 'TaskType' is imported but never used.
+    ,-[src/agents/router-stress.test.ts:20:8]
+ 19 |   type ModelCandidate,
+ 20 |   type TaskType,
+    :        ^^^^|^^^
+    :            `-- 'TaskType' is imported here
+ 21 | } from "./smart-routing.js";
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Variable 'taskType' is declared but never used. Unused variables should start with a '_'.
+     ,-[src/agents/router-stress.test.ts:417:17]
+ 416 | 
+ 417 |     for (const [taskType, prompt] of Object.entries(taskPrompts)) {
+     :                 ^^^^|^^^
+     :                     `-- 'taskType' is declared here
+ 418 |       const routed = applySmartRouting({ candidates, prompt });
+     `----
+  help: Consider removing this declaration.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/gateway/server.chat.gateway-server-chat-b.e2e.test.ts:153:31]
+ 152 |           capturedOpts = opts;
+ 153 |           return undefined as any;
+     :                               ^^^
+ 154 |         });
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/gateway/server.chat.gateway-server-chat-b.e2e.test.ts:300:121]
+ 299 |       spy.mockReset();
+ 300 |       spy.mockImplementationOnce(async (_ctx: unknown, opts: GetReplyOptions | undefined, ..._args: unknown[]): Promise<any> => {
+     :                                                                                                                         ^^^
+ 301 |         opts?.onAgentRunStart?.(opts.runId ?? "idem-abort-1");
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/agents/pi-embedded-runner/run.overflow-failover.test.ts:192:12]
+ 191 |         cloudCodeAssistFormatError: false,
+ 192 |       } as any)
+     :            ^^^
+ 193 |       .mockResolvedValueOnce({
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/agents/pi-embedded-runner/run.overflow-failover.test.ts:205:12]
+ 204 |         cloudCodeAssistFormatError: false,
+ 205 |       } as any);
+     :            ^^^
+ 206 | 
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/agents/pi-embedded-runner/run.overflow-failover.test.ts:220:46]
+ 219 |     try {
+ 220 |       await runEmbeddedPiAgent(baseParams as any);
+     :                                              ^^^
+ 221 |       expect.fail("Should have thrown FailoverError");
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/agents/pi-embedded-runner/run.overflow-failover.test.ts:222:19]
+ 221 |       expect.fail("Should have thrown FailoverError");
+ 222 |     } catch (err: any) {
+     :                   ^^^
+ 223 |       expect(err).toBeInstanceOf(FailoverError);
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/config/types.agent-defaults.ts:125:18]
+ 124 | export type AgentDefaultsConfig = {
+ 125 |   smartRouting?: any;
+     :                  ^^^
+ 126 |   tokenBudget?: any;
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x typescript-eslint(no-explicit-any): Unexpected `any`. Specify a different type.
+     ,-[src/config/types.agent-defaults.ts:126:17]
+ 125 |   smartRouting?: any;
+ 126 |   tokenBudget?: any;
+     :                 ^^^
+ 127 |   /** Primary model and fallbacks (provider/model). */
+     `----
+  help: Use `unknown` instead, this will force you to explicitly, and safely, assert the type is correct.
+
+  x eslint(no-unused-vars): Type 'ModelScanResult' is imported but never used.
+    ,-[src/agents/model-discovery.ts:12:15]
+ 11 | import type { OpenClawConfig } from "../config/config.js";
+ 12 | import type { ModelScanResult } from "./model-scan.js";
+    :               ^^^^^^^|^^^^^^^
+    :                      `-- 'ModelScanResult' is imported here
+ 13 | import { scanOpenRouterModels } from "./model-scan.js";
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'isDiscoveryScanDue' is imported but never used.
+   ,-[src/agents/model-discovery.test.ts:2:10]
+ 1 | import { describe, expect, it, vi, afterEach } from "vitest";
+ 2 | import { isDiscoveryScanDue, stopDiscoveryCron } from "./model-discovery-cron.js";
+   :          ^^^^^^^^^|^^^^^^^^
+   :                   `-- 'isDiscoveryScanDue' is imported here
+ 3 | import {
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'saveDiscoveryState' is imported but never used.
+   ,-[src/agents/model-discovery.test.ts:7:3]
+ 6 |   loadDiscoveryState,
+ 7 |   saveDiscoveryState,
+   :   ^^^^^^^^^|^^^^^^^^
+   :            `-- 'saveDiscoveryState' is imported here
+ 8 | } from "./model-discovery.js";
+   `----
+  help: Consider removing this import.
+
+Found 0 warnings and 14 errors.
+Finished in 18.3s on 3558 files with 136 rules using 8 threads.

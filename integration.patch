@@ -1,0 +1,252 @@
+diff --git a/src/agents/model-fallback.ts b/src/agents/model-fallback.ts
+index c5ee529c4..f57d753c9 100644
+--- a/src/agents/model-fallback.ts
++++ b/src/agents/model-fallback.ts
+@@ -19,6 +19,8 @@ import {
+   resolveConfiguredModelRef,
+   resolveModelRefFromString,
+ } from "./model-selection.js";
++import { applySmartRouting } from "./smart-routing.js";
++import { applyBudgetSteering } from "./token-budget.js";
+ 
+ type ModelCandidate = {
+   provider: string;
+@@ -227,6 +229,8 @@ export async function runWithModelFallback<T>(params: {
+   agentDir?: string;
+   /** Optional explicit fallbacks list; when provided (even empty), replaces agents.defaults.model.fallbacks. */
+   fallbacksOverride?: string[];
++  /** When provided, enables smart routing: reorders candidates based on task type. */
++  prompt?: string;
+   run: (provider: string, model: string) => Promise<T>;
+   onError?: (attempt: {
+     provider: string;
+@@ -241,12 +245,23 @@ export async function runWithModelFallback<T>(params: {
+   model: string;
+   attempts: FallbackAttempt[];
+ }> {
+-  const candidates = resolveFallbackCandidates({
++  const rawCandidates = resolveFallbackCandidates({
+     cfg: params.cfg,
+     provider: params.provider,
+     model: params.model,
+     fallbacksOverride: params.fallbacksOverride,
+   });
++  const routedCandidates = applySmartRouting({
++    candidates: rawCandidates,
++    prompt: params.prompt,
++    cfg: params.cfg,
++  });
++  // Apply budget steering: deprioritize providers near quota limits.
++  // This is a no-op if usage data is unavailable.
++  const candidates = await applyBudgetSteering({
++    candidates: routedCandidates,
++    cfg: params.cfg,
++  });
+   const authStore = params.cfg
+     ? ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false })
+     : null;
+diff --git a/src/agents/pi-embedded-subscribe.handlers.messages.ts b/src/agents/pi-embedded-subscribe.handlers.messages.ts
+index 840d5c74b..961ece273 100644
+--- a/src/agents/pi-embedded-subscribe.handlers.messages.ts
++++ b/src/agents/pi-embedded-subscribe.handlers.messages.ts
+@@ -16,6 +16,7 @@ import {
+   formatReasoningMessage,
+   promoteThinkingTagsToBlocks,
+ } from "./pi-embedded-utils.js";
++import { checkStreamingChunk, checkFinalResponse } from "./quality-guard.js";
+ 
+ const stripTrailingDirective = (text: string): string => {
+   const openIndex = text.lastIndexOf("[[");
+@@ -107,6 +108,9 @@ export function handleMessageUpdate(
+     } else {
+       ctx.state.blockBuffer += chunk;
+     }
++
++    // Check streaming chunk quality
++    checkStreamingChunk(ctx.qualityGuardState, chunk);
+   }
+ 
+   if (ctx.state.streamReasoning) {
+@@ -321,6 +325,22 @@ export function handleMessageEnd(
+     }
+   }
+ 
++  // Clear stall check interval before final checks so thrown errors can't leak the timer.
++  clearInterval(ctx.stallCheckInterval);
++
++  // For non-streaming providers, only message_end may carry assistant text.
++  // Seed the guard once so final validation reflects actual output.
++  if (ctx.qualityGuardState.totalChars === 0 && text.trim()) {
++    checkStreamingChunk(ctx.qualityGuardState, text);
++  }
++
++  // Only validate when we observed some assistant output.
++  // Embedded streams can legitimately contain short snippets, so keep
++  // validation focused on empty responses in this path.
++  if (ctx.qualityGuardState.totalChars > 0) {
++    checkFinalResponse(ctx.qualityGuardState, { minResponseChars: 1 });
++  }
++
+   ctx.state.deltaBuffer = "";
+   ctx.state.blockBuffer = "";
+   ctx.blockChunker?.reset();
+diff --git a/src/agents/pi-embedded-subscribe.handlers.types.ts b/src/agents/pi-embedded-subscribe.handlers.types.ts
+index e9758ba8f..23bb69d99 100644
+--- a/src/agents/pi-embedded-subscribe.handlers.types.ts
++++ b/src/agents/pi-embedded-subscribe.handlers.types.ts
+@@ -8,6 +8,7 @@ import type {
+   BlockReplyChunking,
+   SubscribeEmbeddedPiSessionParams,
+ } from "./pi-embedded-subscribe.types.js";
++import type { QualityGuardState } from "./quality-guard.js";
+ 
+ export type EmbeddedSubscribeLogger = {
+   debug: (message: string) => void;
+@@ -64,6 +65,8 @@ export type EmbeddedPiSubscribeState = {
+ export type EmbeddedPiSubscribeContext = {
+   params: SubscribeEmbeddedPiSessionParams;
+   state: EmbeddedPiSubscribeState;
++  qualityGuardState: QualityGuardState;
++  stallCheckInterval: NodeJS.Timeout;
+   log: EmbeddedSubscribeLogger;
+   blockChunking?: BlockReplyChunking;
+   blockChunker: EmbeddedBlockChunker | null;
+diff --git a/src/agents/pi-embedded-subscribe.ts b/src/agents/pi-embedded-subscribe.ts
+index e98537750..dba9b7829 100644
+--- a/src/agents/pi-embedded-subscribe.ts
++++ b/src/agents/pi-embedded-subscribe.ts
+@@ -16,6 +16,7 @@ import {
+ } from "./pi-embedded-helpers.js";
+ import { createEmbeddedPiSessionEventHandler } from "./pi-embedded-subscribe.handlers.js";
+ import { formatReasoningMessage } from "./pi-embedded-utils.js";
++import { createQualityGuardState, checkForStall, type QualityGuardState } from "./quality-guard.js";
+ 
+ const THINKING_TAG_SCAN_RE = /<\s*(\/?)\s*(?:think(?:ing)?|thought|antthinking)\s*>/gi;
+ const FINAL_TAG_SCAN_RE = /<\s*(\/?)\s*final\s*>/gi;
+@@ -31,6 +32,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
+   const reasoningMode = params.reasoningMode ?? "off";
+   const toolResultFormat = params.toolResultFormat ?? "markdown";
+   const useMarkdown = toolResultFormat === "markdown";
++  const qualityGuardState: QualityGuardState = createQualityGuardState();
++  const stallCheckInterval = setInterval(() => {
++    checkForStall(qualityGuardState);
++  }, 10000); // Check for stall every 10 seconds
++
+   const state: EmbeddedPiSubscribeState = {
+     assistantTexts: [],
+     toolMetas: [],
+@@ -298,7 +304,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
+     const codeSpans = buildCodeSpanIndex(text, inlineStateStart);
+ 
+     // 1. Handle <think> blocks (stateful, strip content inside)
+-    let processed = "";
++    const parts: string[] = [];
+     THINKING_TAG_SCAN_RE.lastIndex = 0;
+     let lastIndex = 0;
+     let inThinking = state.thinking;
+@@ -308,15 +314,16 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
+         continue;
+       }
+       if (!inThinking) {
+-        processed += text.slice(lastIndex, idx);
++        parts.push(text.slice(lastIndex, idx));
+       }
+       const isClose = match[1] === "/";
+       inThinking = !isClose;
+       lastIndex = idx + match[0].length;
+     }
+     if (!inThinking) {
+-      processed += text.slice(lastIndex);
++      parts.push(text.slice(lastIndex));
+     }
++    const processed = parts.join("");
+     state.thinking = inThinking;
+ 
+     // 2. Handle <final> blocks (stateful, strip content OUTSIDE)
+@@ -362,11 +369,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
+     }
+     state.final = inFinal;
+ 
+-    // Strict Mode: If enforcing final tags, we MUST NOT return content unless
+-    // we have seen a <final> tag. Otherwise, we leak "thinking out loud" text
+-    // (e.g. "**Locating Manulife**...") that the model emitted without <think> tags.
++    // Strict Mode fallback: If enforcing final tags but no <final> tag was seen,
++    // fall back to returning the processed text. This prevents silent reply drops
++    // when the model (e.g. Gemini) doesn't emit the expected <final> tag.
+     if (!everInFinal) {
+-      return "";
++      return processed;
+     }
+ 
+     // Hardened Cleanup: Remove any remaining <final> tags that might have been
+@@ -381,7 +388,7 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
+     pattern: RegExp,
+     isInside: (index: number) => boolean,
+   ) => {
+-    let output = "";
++    const parts: string[] = [];
+     let lastIndex = 0;
+     pattern.lastIndex = 0;
+     for (const match of text.matchAll(pattern)) {
+@@ -389,11 +396,11 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
+       if (isInside(idx)) {
+         continue;
+       }
+-      output += text.slice(lastIndex, idx);
++      parts.push(text.slice(lastIndex, idx));
+       lastIndex = idx + match[0].length;
+     }
+-    output += text.slice(lastIndex);
+-    return output;
++    parts.push(text.slice(lastIndex));
++    return parts.join("");
+   };
+ 
+   const emitBlockChunk = (text: string) => {
+@@ -507,6 +514,8 @@ export function subscribeEmbeddedPiSession(params: SubscribeEmbeddedPiSessionPar
+   const ctx: EmbeddedPiSubscribeContext = {
+     params,
+     state,
++    qualityGuardState,
++    stallCheckInterval,
+     log,
+     blockChunking,
+     blockChunker,
+diff --git a/src/gateway/server-startup.ts b/src/gateway/server-startup.ts
+index 1971ef8a2..03b0a9486 100644
+--- a/src/gateway/server-startup.ts
++++ b/src/gateway/server-startup.ts
+@@ -3,6 +3,7 @@ import type { loadConfig } from "../config/config.js";
+ import type { loadOpenClawPlugins } from "../plugins/loader.js";
+ import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
+ import { loadModelCatalog } from "../agents/model-catalog.js";
++import { startDiscoveryCron } from "../agents/model-discovery-cron.js";
+ import {
+   getModelRefStatus,
+   resolveConfiguredModelRef,
+@@ -156,5 +157,25 @@ export async function startGatewaySidecars(params: {
+     }, 750);
+   }
+ 
++  // Start model discovery cron if smart routing discovery is enabled.
++  const discoveryConfig = params.cfg?.agents?.defaults?.smartRouting?.discovery;
++  if (discoveryConfig?.enabled && !isTruthyEnvValue(process.env.VITEST)) {
++    try {
++      startDiscoveryCron({
++        cfg: params.cfg,
++        intervalHours: discoveryConfig.intervalHours ?? 24,
++        autoInstallOllama: discoveryConfig.autoInstallOllama ?? false,
++        ollamaMaxSizeGb: discoveryConfig.ollamaMaxSizeGb ?? 8,
++        onNewModels: (orCount, olCount) => {
++          params.log.warn(
++            `Model discovery: found ${orCount} new OpenRouter models, ${olCount} new Ollama models`,
++          );
++        },
++      });
++    } catch (err) {
++      params.log.warn(`model discovery cron failed to start: ${String(err)}`);
++    }
++  }
++
+   return { browserControl, pluginServices };
+ }

@@ -1,5 +1,6 @@
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
+import { startDiscoveryCron } from "../agents/model-discovery-cron.js";
 import {
   getModelRefStatus,
   resolveConfiguredModelRef,
@@ -167,6 +168,26 @@ export async function startGatewaySidecars(params: {
     setTimeout(() => {
       void scheduleRestartSentinelWake({ deps: params.deps });
     }, 750);
+  }
+
+  // Start model discovery cron if smart routing discovery is enabled.
+  const discoveryConfig = params.cfg?.agents?.defaults?.smartRouting?.discovery;
+  if (discoveryConfig?.enabled && !isTruthyEnvValue(process.env.VITEST)) {
+    try {
+      startDiscoveryCron({
+        cfg: params.cfg,
+        intervalHours: discoveryConfig.intervalHours ?? 24,
+        autoInstallOllama: discoveryConfig.autoInstallOllama ?? false,
+        ollamaMaxSizeGb: discoveryConfig.ollamaMaxSizeGb ?? 8,
+        onNewModels: (orCount: number, olCount: number) => {
+          params.log.warn(
+            `Model discovery: found ${orCount} new OpenRouter models, ${olCount} new Ollama models`,
+          );
+        },
+      });
+    } catch (err) {
+      params.log.warn(`model discovery cron failed to start: ${String(err)}`);
+    }
   }
 
   return { browserControl, pluginServices };

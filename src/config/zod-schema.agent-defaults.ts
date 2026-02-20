@@ -14,6 +14,8 @@ import {
 
 export const AgentDefaultsSchema = z
   .object({
+    smartRouting: z.any().optional(),
+    tokenBudget: z.any().optional(),
     model: z
       .object({
         primary: z.string().optional(),

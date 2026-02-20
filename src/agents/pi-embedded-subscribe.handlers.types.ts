@@ -9,6 +9,7 @@ import type {
   BlockReplyChunking,
   SubscribeEmbeddedPiSessionParams,
 } from "./pi-embedded-subscribe.types.js";
+import type { QualityGuardState } from "./quality-guard.js";
 import type { NormalizedUsage } from "./usage.js";
 
 export type EmbeddedSubscribeLogger = {
@@ -82,6 +83,8 @@ export type EmbeddedPiSubscribeState = {
 export type EmbeddedPiSubscribeContext = {
   params: SubscribeEmbeddedPiSessionParams;
   state: EmbeddedPiSubscribeState;
+  qualityGuardState: QualityGuardState;
+  stallCheckInterval: NodeJS.Timeout;
   log: EmbeddedSubscribeLogger;
   blockChunking?: BlockReplyChunking;
   blockChunker: EmbeddedBlockChunker | null;

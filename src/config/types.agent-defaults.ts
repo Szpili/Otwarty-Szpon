@@ -122,6 +122,10 @@ export type CliBackendConfig = {
 };
 
 export type AgentDefaultsConfig = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  smartRouting?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tokenBudget?: any;
   /** Primary model and fallbacks (provider/model). */
   model?: AgentModelListConfig;
   /** Optional image-capable model and fallbacks (provider/model). */

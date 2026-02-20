@@ -1,0 +1,15 @@
+src/agents/model-fallback.ts(25,35): error TS2307: Cannot find module './smart-routing.js' or its corresponding type declarations.
+src/agents/model-fallback.ts(26,37): error TS2307: Cannot find module './token-budget.js' or its corresponding type declarations.
+src/agents/pi-embedded-subscribe.handlers.messages.ts(20,57): error TS2307: Cannot find module './quality-guard.js' or its corresponding type declarations.
+src/agents/pi-embedded-subscribe.handlers.types.ts(13,40): error TS2307: Cannot find module './quality-guard.js' or its corresponding type declarations.
+src/agents/pi-embedded-subscribe.ts(22,80): error TS2307: Cannot find module './quality-guard.js' or its corresponding type declarations.
+src/gateway/server-startup.ts(3,36): error TS2307: Cannot find module '../agents/model-discovery-cron.js' or its corresponding type declarations.
+src/gateway/server-startup.ts(174,57): error TS2339: Property 'smartRouting' does not exist on type 'AgentDefaultsConfig'.
+src/gateway/server-startup.ts(182,23): error TS7006: Parameter 'orCount' implicitly has an 'any' type.
+src/gateway/server-startup.ts(182,32): error TS7006: Parameter 'olCount' implicitly has an 'any' type.
+src/gateway/server.chat.gateway-server-chat-b.e2e.test.ts(151,36): error TS2345: Argument of type '(_ctx: unknown, opts?: GetReplyOptions) => Promise<void>' is not assignable to parameter of type '(ctx: MsgContext, opts?: GetReplyOptions | undefined, configOverride?: OpenClawConfig | undefined) => Promise<ReplyPayload | ReplyPayload[] | undefined>'.
+  Type 'Promise<void>' is not assignable to type 'Promise<ReplyPayload | ReplyPayload[] | undefined>'.
+    Type 'void' is not assignable to type 'ReplyPayload | ReplyPayload[] | undefined'.
+src/gateway/server.chat.gateway-server-chat-b.e2e.test.ts(299,34): error TS2345: Argument of type '(_ctx: MsgContext, opts: GetReplyOptions | undefined) => Promise<void>' is not assignable to parameter of type '(ctx: MsgContext, opts?: GetReplyOptions | undefined, configOverride?: OpenClawConfig | undefined) => Promise<ReplyPayload | ReplyPayload[] | undefined>'.
+  Type 'Promise<void>' is not assignable to type 'Promise<ReplyPayload | ReplyPayload[] | undefined>'.
+    Type 'void' is not assignable to type 'ReplyPayload | ReplyPayload[] | undefined'.

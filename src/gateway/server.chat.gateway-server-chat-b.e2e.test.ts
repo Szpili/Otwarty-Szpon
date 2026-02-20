@@ -148,9 +148,13 @@ describe("gateway server chat", () => {
       try {
         spy.mockReset();
         let capturedOpts: GetReplyOptions | undefined;
-        spy.mockImplementationOnce(async (_ctx: unknown, opts?: GetReplyOptions) => {
-          capturedOpts = opts;
-        });
+        spy.mockImplementationOnce(
+          async (_ctx: unknown, opts?: GetReplyOptions, ..._args: unknown[]) => {
+            capturedOpts = opts;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return undefined as any;
+          },
+        );
 
         const sendRes = await rpcReq(ws, "chat.send", {
           sessionKey: "main",
@@ -296,25 +300,32 @@ describe("gateway server chat", () => {
       await writeMainSessionStore();
 
       spy.mockReset();
-      spy.mockImplementationOnce(async (_ctx, opts) => {
-        opts?.onAgentRunStart?.(opts.runId ?? "idem-abort-1");
-        const signal = opts?.abortSignal;
-        await new Promise<void>((resolve) => {
-          if (!signal || signal.aborted) {
-            aborted = Boolean(signal?.aborted);
-            resolve();
-            return;
-          }
-          signal.addEventListener(
-            "abort",
-            () => {
-              aborted = true;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      spy.mockImplementationOnce(
+        async (
+          _ctx: unknown,
+          opts: GetReplyOptions | undefined,
+          ..._args: unknown[]
+        ): Promise<any> => {
+          opts?.onAgentRunStart?.(opts.runId ?? "idem-abort-1");
+          const signal = opts?.abortSignal;
+          await new Promise<void>((resolve) => {
+            if (!signal || signal.aborted) {
+              aborted = Boolean(signal?.aborted);
               resolve();
-            },
-            { once: true },
-          );
-        });
-      });
+              return;
+            }
+            signal.addEventListener(
+              "abort",
+              () => {
+                aborted = true;
+                resolve();
+              },
+              { once: true },
+            );
+          });
+        },
+      );
 
       const sendResP = onceMessage(ws, (o) => o.type === "res" && o.id === "send-abort-1", 8_000);
       sendReq(ws, "send-abort-1", "chat.send", {
